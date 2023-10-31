@@ -1,0 +1,77 @@
+﻿@page "/"
+
+@using Microsoft.AspNetCore.Authorization;
+@using Microsoft.AspNetCore.Identity;
+@using System.Security.Claims
+@inject UserManager<IdentityUser> _UserManager
+@inject RoleManager<IdentityRole> _RoleManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime js
+
+<PageTitle>Index</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<SurveyPrompt Title="How is Blazor working for you?" />
+
+
+<AuthorizeView Roles="Administrators">
+    <Authorized>
+        <span>Hy Admin</span>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="Users">
+    <Authorized>
+        <span>Hy User</span>
+    </Authorized>
+</AuthorizeView>
+
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ClaimsPrincipal CurrentUser = (await authenticationStateTask).User;
+        if (CurrentUser!.Identity!.IsAuthenticated)
+        {
+            // NOTE: CurrentUser.Identity.Name =>  user Email used for the registration.
+            string userEmail = CurrentUser.Identity.Name!;
+
+            var user = await _UserManager.FindByNameAsync(userEmail);
+            var getUserRoles = await _UserManager.GetRolesAsync(user!);
+            if (getUserRoles.Count == 0)
+            {
+                var AdminRoleResult = await _RoleManager.FindByNameAsync("Administrators");
+                if (AdminRoleResult == null)
+                {
+                    // This means, Administrator role is not yet created, meaning it has not being assigned to anyone, if so then create it and assign to the current user.
+                    await _RoleManager.CreateAsync(new IdentityRole("Administrators"));
+                    await _UserManager.AddToRoleAsync(user!, "Administrators");
+                    return;
+                }
+                else
+                {
+                    var UserRoleResult = await _RoleManager.FindByNameAsync("Users");
+                    if (UserRoleResult == null)
+                    {
+                        await _RoleManager.CreateAsync(new IdentityRole("Users"));
+                    }
+                    await _UserManager.AddToRoleAsync(user!, "Users");
+                    try { await js.InvokeVoidAsync("alert", $"{user!.Email} has being asigned to {getUserRoles!.FirstOrDefault()} now"); } catch { }
+                    return;
+                }
+            }
+            else
+            {// since it blazor server, js doenst work on first call unless second call, first will create the user role so lets read from the second call.
+                try { await js.InvokeVoidAsync("alert", $"{user!.Email} has being asigned to {getUserRoles!.FirstOrDefault()}"); } catch { }
+            }
+        }
+    }
+}
+
+
