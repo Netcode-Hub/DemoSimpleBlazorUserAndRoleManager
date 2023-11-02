@@ -1,0 +1,195 @@
+﻿@page "/administration"
+@attribute [Authorize(Roles = "Administrators")]
+<PageTitle>Administration</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+
+          <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"> Manage Users </div>
+
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @if (UsersDetails.Count > 0)
+                            {
+                                foreach (var usr in UsersDetails)
+                                {
+                                    <tr>
+                                        <td>@usr.UserName</td>
+                                        <td>@usr.Role</td>
+                                        <td>
+                                            <div class="hstack gap-3">
+                                                <i class="oi oi-pencil text-info" @onclick="(async ()=> EditUser(usr))" title="Change @usr.UserName's role" style="cursor:pointer"></i>
+                                                <i class="oi oi-trash text-danger" @onclick="(async ()=>await DeleteUser(usr))" title="Change @usr.UserName" style="cursor:pointer"></i>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-header">Available Roles</div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        @if (Roles.Count > 0)
+                        {
+                            int i = 1;
+                            foreach (var r in Roles)
+                            {
+                                <li class="list-group-item">@i) @r.Name</li>
+                                i++;
+                            }
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-header">Available Users</div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        @if (Users.Count > 0)
+                        {
+                            int i = 1;
+                            foreach (var u in Users)
+                            {
+                                <li class="list-group-item">@i) @u.UserName</li>
+                                i++;
+                            }
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mt-5">
+            <UpdateUserPage ShowUpdatePage="ShowUpdatePage"
+                            UserDetails="UserDetailsModel"
+                            HandleOperationEventCallBack="HandleOperationEventCallBack"
+                            CardTitle="@CardTitle"
+                            Roles="UserRoles" />
+        </div>
+    </div>
+</div>
+
+
+
+@code{
+    public List<string> UserRoles { get; set; } = new();
+
+    public string? CardTitle { get; set; }
+    public bool ShowUpdatePage { get; set; }
+    public UserDetails UserDetailsModel { get; set; } = new();
+
+    private List<IdentityRole> Roles = new();
+    private List<IdentityUser> Users = new();
+    private List<UserDetails> UsersDetails = new();
+    private string CachedUserRole = string.Empty;
+
+    protected async override Task OnInitializedAsync()
+    {
+        LoadRoles();
+        await LoadUsers();
+    }
+
+    private void LoadRoles()
+    {
+        Roles?.Clear();
+        UserRoles?.Clear();
+        //Get all Roles
+        var roles = _RoleManager.Roles.ToList();
+        foreach (var r in roles)
+        {
+            UserRoles!.Add(r.Name!);
+            Roles!.Add(r);
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        Users?.Clear();
+        //Get all Users
+        var users = _UserManager.Users.ToList();
+        foreach (var u in users)
+        {
+            Users!.Add(u);
+        }
+        await PopulateUserData(users);
+    }
+
+    private async Task PopulateUserData(List<IdentityUser> users)
+    {
+        UsersDetails?.Clear();
+        //Populate User Data including username and role
+        foreach (var user in users)
+        {
+            var usr = await _UserManager.GetRolesAsync(user!);
+            UsersDetails!.Add(new UserDetails()
+                {
+                    UserName = user.UserName,
+                    Role = usr.FirstOrDefault()
+                });
+        }
+    }
+
+    private void EditUser(UserDetails editModel)
+    {
+        if (editModel is null) return;
+
+        UserDetailsModel = new UserDetails();
+        UserDetailsModel = editModel;
+        CachedUserRole = editModel.Role!;
+        CardTitle = $"Update {editModel.UserName} data";
+        ShowUpdatePage = true;
+    }
+
+    private async Task DeleteUser(UserDetails model)
+    {
+        if (model is null) return;
+
+        bool confirm = await js.InvokeAsync<bool>("confirm", $"Are you sure of deleting {model.UserName}'s data?");
+        if (!confirm) return;
+
+        //find user with email
+        var user = await _UserManager.FindByNameAsync(model.UserName!);
+        await _UserManager.DeleteAsync(user!);
+         LoadRoles();
+        await LoadUsers();
+        StateHasChanged();
+    }
+
+    private async Task HandleOperationEventCallBack(UserDetails model)
+    {
+        if (model is null) return;
+
+        // Check if email/username exist
+        var user = await _UserManager.FindByNameAsync(model.UserName!);
+        if (user is null)
+        {
+            await js.InvokeVoidAsync("alert", $"Sorry {model.UserName} needs to register first");
+            return;
+        }
+
+        // Remove the old role and assign new one.
+        await _UserManager.RemoveFromRoleAsync(user, CachedUserRole);
+        await _UserManager.AddToRoleAsync(user!, model.Role!);
+    }
+}

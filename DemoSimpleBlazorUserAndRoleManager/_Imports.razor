@@ -8,3 +8,12 @@
 @using Microsoft.JSInterop
 @using DemoSimpleBlazorUserAndRoleManager
 @using DemoSimpleBlazorUserAndRoleManager.Shared
+
+
+@using Microsoft.AspNetCore.Authorization;
+@using Microsoft.AspNetCore.Identity;
+@using System.Security.Claims
+@inject UserManager<IdentityUser> _UserManager
+@inject RoleManager<IdentityRole> _RoleManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime js

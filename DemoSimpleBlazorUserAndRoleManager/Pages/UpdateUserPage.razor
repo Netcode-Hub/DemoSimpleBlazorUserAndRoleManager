@@ -1,0 +1,42 @@
+﻿@if (ShowUpdatePage)
+{
+    <div class="card">
+        <div class="card-header">@CardTitle</div>
+        <div class="card-body">
+            <EditForm Model="UserDetails" OnValidSubmit="HandleOperation">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label class="form-label">Username </label>
+                    <InputText @bind-Value="UserDetails.UserName" class="form-control" DisplayName="Username" />
+                    <ValidationMessage For="()=>UserDetails.UserName"></ValidationMessage>
+                </div>
+                <div class="form-group mt-2">
+                    <label class="form-label">Select Role</label>
+                    <InputSelect class="form-control" @bind-Value="UserDetails.Role">
+                        @foreach (var r in Roles)
+                        {
+                            <option value="@r"> @r</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="()=>UserDetails.Role"></ValidationMessage>
+                </div>
+                <div class="form-group mt-3">
+                    <button class="btn btn-primary" type="submit">Save</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+@code {
+    [Parameter] public bool ShowUpdatePage { get; set; }
+    [Parameter] public string CardTitle { get; set; } = string.Empty;
+    [Parameter] public UserDetails UserDetails { get; set; } = new();
+    [Parameter] public EventCallback<UserDetails> HandleOperationEventCallBack { get; set; }
+    [Parameter] public List<string> Roles { get; set; } = new();
+    private async Task HandleOperation()
+    {
+        await HandleOperationEventCallBack.InvokeAsync(UserDetails);
+    }
+}
